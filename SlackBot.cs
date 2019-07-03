@@ -11,27 +11,48 @@ namespace DarkSlackBot
     {
         public string _user;
         public string _directory;
-        public OperatingSystem _os;
+        public bool _isWindows;
 
         public void Run()
+        {            
+            CheckOperatingSystem();
+
+            if(_isWindows)
+            {
+                RunOnWindows();
+            } else
+            {
+                RunOnMAC();
+            }            
+        }
+
+        private void RunOnWindows()
         {
+            Console.WriteLine("Windows OS Detected");
             GetUser();
             var directoryFolders = GetDirectoryInfo();
             var folders = ParseFolders(directoryFolders);
             var newestVersion = SelectNewestVersion(folders);
-            DirectoryDrill(newestVersion);
+            WindowsDirectoryDrill(newestVersion);
         }
 
-
+        private void RunOnMAC()
+        {
+            Console.WriteLine("MAC OS Detected");
+            MacDirectoryDrill();
+        }
 
         private void GetUser()
-        {
-            Console.WriteLine($"Press Any Key To Begin...");
-            Console.ReadKey();
-            
+        {            
             _user = Environment.UserName;            
         }
         
+        private void CheckOperatingSystem()
+        {            
+            var platform = Environment.OSVersion.Platform.ToString().ToLower();
+            _isWindows = platform.Contains("win");
+        }
+
         private List<string> GetDirectoryInfo()
         {
             Console.WriteLine($"Fetching Slack Directory");
@@ -40,7 +61,7 @@ namespace DarkSlackBot
             var directoryFolders = Directory.GetDirectories(_directory).ToList();
 
             return directoryFolders;
-        }
+        }  
 
         private List<string> ParseFolders(List<string> directoryFolders)
         {
@@ -66,20 +87,33 @@ namespace DarkSlackBot
             return directoryFolders.Last();
         }
 
-        private void DirectoryDrill(string newestVersion)
+        private void WindowsDirectoryDrill(string newestVersion)
         {
             var neededFile = @"ssb-interop.js";
             var fileAddress = $@"{_directory}\{newestVersion}\resources\app.asar.unpacked\src\static\";
-            var fileLocation = $@"{fileAddress}{neededFile}";
+            var file = $@"{fileAddress}{neededFile}";
 
-            if (File.Exists(fileLocation))
+            SlackBotWriter(file, fileAddress);
+        }
+
+        private void MacDirectoryDrill()
+        {
+            var neededFile = @"ssb-interop.js";
+            var fileAddress = $@"/Applications/Slack.app/Contents/Resources/app.asar.unpacked/src/static/";
+            var file = $@"{fileAddress}{neededFile}";
+            SlackBotWriter(file, fileAddress);
+        }
+
+        private void SlackBotWriter(string file, string fileAddress)
+        {
+            if (File.Exists(file))
             {
                 Console.WriteLine($"Creating Backup");
-                CreateFileBackup(fileLocation, fileAddress);
+                CreateFileBackup(file, fileAddress);
 
                 var darkSlackCode = GetDarkSlackCode();
 
-                using(StreamWriter writer = File.AppendText(fileLocation))
+                using (StreamWriter writer = File.AppendText(file))
                 {
                     Console.WriteLine($"Injecting JavaScript");
                     writer.Write(darkSlackCode);
@@ -92,7 +126,6 @@ namespace DarkSlackBot
                 Console.WriteLine("Error: File Not Found =(");
                 Console.ReadKey();
             }
-
         }
 
         private string GetDarkSlackCode()
